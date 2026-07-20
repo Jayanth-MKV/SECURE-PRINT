@@ -1,49 +1,41 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-const secretKey = "your-secret-key"; // Replace with your own secret key
+const phonePattern = /^\+?[1-9]\d{7,14}$/;
 
-
-function login(req, res) {
-  const { phoneNumber, password } = req.body;
-
-  User.findOne({ phoneNumber })
-    .then((user) => {
-    if (!user || user.password !== password) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const token = jwt.sign({ id: user._id, phone: phoneNumber }, secretKey, {
-      expiresIn: "1h",
-    });
-
-    res.json({ token });
-  })
-    .catch((err) => {
-            return res.status(401).json({ message: "Invalid credentials" });
-    });
+function issueToken(user) {
+  return jwt.sign({ sub: user.id, phone: user.phoneNumber }, process.env.JWT_SECRET, {
+    expiresIn: '1h',
+    issuer: 'secure-print-local',
+    audience: 'secure-print-clients',
+  });
 }
 
-function signup(req, res) {
-  const { phoneNumber, password } = req.body;
-  // console.log(phoneNumber,password)
+async function login(request, response) {
+  const phoneNumber = String(request.body.phoneNumber || '').trim();
+  const password = String(request.body.password || '');
+  const user = await User.findOne({ phoneNumber }).select('+password');
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return response.status(401).json({ message: 'Invalid credentials' });
+  }
+  return response.json({ token: issueToken(user) });
+}
 
-  const newUser = new User({ phoneNumber, password });
+async function signup(request, response) {
+  const phoneNumber = String(request.body.phoneNumber || '').trim();
+  const password = String(request.body.password || '');
+  if (!phonePattern.test(phoneNumber) || password.length < 10 || password.length > 128) {
+    return response.status(400).json({ message: 'Use a valid phone number and a 10–128 character password' });
+  }
 
-  newUser.save().then(() => {
-
-    const token = jwt.sign({ id: newUser._id }, secretKey, { expiresIn: "1h" });
-
-    res.json({ token });
-  })
-    .catch((err) => {
-            if (err.code === 11000) {
-              return res
-                .status(400)
-                .json({ message: "Phone number already in use" });
-            }
-            return res.status(500).json({ message: "Error creating user" });
-    });
+  try {
+    const user = await User.create({ phoneNumber, password: await bcrypt.hash(password, 12) });
+    return response.status(201).json({ token: issueToken(user) });
+  } catch (error) {
+    if (error.code === 11000) return response.status(409).json({ message: 'Account already exists' });
+    throw error;
+  }
 }
 
 module.exports = { login, signup };

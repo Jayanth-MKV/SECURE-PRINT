@@ -1,77 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>login</title>
-    <style>
-.Auth-form-container {
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-    align-items: center;
-    width: 100vw;
-    height: 100vh;
-}
-
-.Auth-form {
-    width: 420px;
-    box-shadow: rgb(0 0 0 / 16%) 1px 1px 10px;
-    padding-top: 30px;
-    padding-bottom: 20px;
-    border-radius: 8px;
-    background-color: white;
-}
-
-.Auth-form-content {
-    padding-left: 12%;
-    padding-right: 12%;
-}
-
-.Auth-form-title {
-    text-align: center;
-    margin-bottom: 1em;
-    font-size: 24px;
-    color: rgb(34, 34, 34);
-    font-weight: 800;
-}
-
-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: rgb(34, 34, 34);
-}
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>Secure Print sign in</title>
+  <style>
+    body { font: 16px system-ui; margin: 0; background: #f3f4f6; }
+    main { max-width: 420px; margin: 10vh auto; padding: 2rem; background: white; border-radius: 12px; }
+    form { display: grid; gap: 0.75rem; }
+    input, button { padding: 0.7rem; font: inherit; }
+  </style>
 </head>
 <body>
-    <div class='Auth-form-container'>
-        <h1 class=''>Secure Print</h1>
-      <form class='Auth-form'>
-        <div class='Auth-form-content'>
-          <h3 class='Auth-form-title'>Sign In</h3>
-          <div class='form-group mt-3'>
-            <label>Phone Number</label><br>
-            <input
-              type='phone'
-                className='form-control mt-1'
-              placeholder='Enter Phone Number'
-            >
-          </div>
-          <div class='form-group mt-3'>
-            <label>Password</label><br>
-            <input
-              type='password'
-                className='form-control mt-1'
-              placeholder='Enter password'
-            >
-          </div>
-          <div class='d-grid gap-2 mt-3'>
-            <a href="index.html"  class='btn btn-primary'>
-              Submit
-          </a>
-          </div>
-        </div>
-      </form>
-    </div>
+  <main>
+    <h1>Secure Print workstation</h1>
+    <p>Sign in to retrieve only the documents owned by this account.</p>
+    <form id="loginForm">
+      <label for="phoneNumber">Phone number</label>
+      <input id="phoneNumber" type="tel" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" maxlength="128" required>
+      <button type="submit">Sign in</button>
+      <p id="status" role="alert"></p>
+    </form>
+  </main>
+  <script src="renderer.js"></script>
 </body>
 </html>

@@ -1,24 +1,13 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const { login, signup } = require("../controller/User");
-const path = require("path");
-const app = express();
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const { login, signup } = require('../controller/User');
 
-const bodyparser = require("body-parser");
+const router = express.Router();
+const authLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: true });
+const asyncHandler = (handler) => (request, response, next) =>
+  Promise.resolve(handler(request, response, next)).catch(next);
 
-/*assuming an express app is declared here*/
-app.use(bodyparser.json());
-app.use(bodyparser.urlencoded({ extended: true }));
-app.use(express.static(__dirname + "/uploads"));
+router.post('/login', authLimiter, asyncHandler(login));
+router.post('/signup', authLimiter, asyncHandler(signup));
 
-var cors = require("cors");
-app.use(cors());
-app.use(express.json());
-
-app.post("/login", login);
-app.post("/signup", signup);
-
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use(require("../routes/Pdf"));
-
-module.exports = app;
+module.exports = router;

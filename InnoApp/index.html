@@ -1,26 +1,21 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <title>PDF Printer</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>Secure Print queue</title>
 </head>
 <body>
-  <ul id="pdfList"></ul>
+  <main>
+    <h1>Pending documents</h1>
+    <p>Select a local printer. A document is removed from the server only after Electron receives a successful print callback.</p>
+    <label for="printer">Printer</label>
+    <select id="printer"></select>
+    <button id="refresh" type="button">Refresh queue</button>
+    <p id="status" role="status"></p>
+    <ul id="pdfList"></ul>
+  </main>
   <script src="renderer.js"></script>
 </body>
 </html>
-
-
-
-<!-- <!DOCTYPE html>
-<html>
-<head>
-  <title>PDF Viewer & Printer</title>
-</head>
-<body>
-  <h1>PDF Viewer & Printer</h1>
-  <button id="fetch-and-display-pdf">Fetch and Display PDF</button>
-  <button id="print-pdf">Print PDF</button>
-  <iframe id="pdf-viewer" style="display: none;"></iframe>
-  <script src="renderer.js"></script>
-</body>
-</html> -->

@@ -1,101 +1,58 @@
-import React,{useState} from 'react'
-import axios from "axios";
-import { useLocation,useNavigate } from "react-router-dom";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../utils';
 
 const MAX_COUNT = 5;
 
 function Upload() {
-
-  const location = useLocation();
-  // console.log(location.pathname);
   const navigate = useNavigate();
-  const id=location.state
-  console.log(location)
-  // let id = location.pathname.split('/')[2]
-  // console.log(id);
-  
+  const [files, setFiles] = useState([]);
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-
-const [uploadedFiles, setUploadedFiles] = useState([]);
-const [fileLimit, setFileLimit] = useState(false);
-const [message, setMessage] = useState('')
-  
-const handleUploadFiles = (files) => {
-  const uploaded = [...uploadedFiles];
-  let limitExceeded = false;
-  files.some((file) => {
-    if (uploaded.findIndex((f) => f.name === file.name) === -1) {
-      uploaded.push(file);
-      if (uploaded.length === MAX_COUNT) setFileLimit(true);
-      if (uploaded.length > MAX_COUNT) {
-        alert(`You can only add a maximum of ${MAX_COUNT} files`);
-        setFileLimit(false);
-        limitExceeded = true;
-        return true;
-      }
+  const handleFiles = (event) => {
+    const selected = Array.from(event.target.files || []).slice(0, MAX_COUNT);
+    if (selected.some((file) => file.type !== 'application/pdf')) {
+      setFiles([]);
+      setMessage('Only PDF files are accepted.');
+      return;
     }
-  });
-  if (!limitExceeded) setUploadedFiles(uploaded);
-};
-
-const handleFileEvent = (e) => {
-  const chosenFiles = Array.prototype.slice.call(e.target.files);
-  handleUploadFiles(chosenFiles);
+    setFiles(selected);
+    setMessage(selected.length ? `${selected.length} PDF file(s) ready.` : '');
   };
-  
-  const handleClick = async (e) => {
-    e.preventDefault();
-    const formData = new FormData();
-    uploadedFiles.forEach((file) => {
-      formData.append("file", file);
-    })
 
-    formData.append("phoneNumber", id);
+  const upload = async (event) => {
+    event.preventDefault();
+    if (!files.length) return setMessage('Choose at least one PDF.');
+    const data = new FormData();
+    files.forEach((file) => data.append('file', file));
+    setSubmitting(true);
     try {
-      const response = await axios.post("http://localhost:5000/upload?phoneNumber="+id,formData);
-
-      console.log(response)
-
-      setMessage(response.data.message);
-      
-    } catch (err) {
-      console.log(err)
+      await api.post('/documents', data);
+      setFiles([]);
+      setMessage('Documents uploaded to your authenticated queue.');
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Upload failed.');
+    } finally {
+      setSubmitting(false);
     }
-  }
+  };
 
-return (
-  <div className=' h-screen flex flex-col p-5 justify-center items-center'>
-    <button
-      className='absolute top-2 left-2 cursor-pointer border-2 rounded-md border-blue-500 md:p-2 p-1 '
-      onClick={() => navigate("/")}>
-      Home
-    </button>
-    <input
-      id='fileUpload'
-      type='file'
-      multiple
-      name='file'
-      accept='application/pdf, image/png'
-      onChange={handleFileEvent}
-      disabled={fileLimit}
-    />
-
-    <label htmlFor='fileUpload'>
-      <div
-        onClick={handleClick}
-        className={`btn btn-primary ${!fileLimit ? "" : "disabled"} `}>
-        Upload Files
-      </div>
-    </label>
-
-    <div className='uploaded-files-list'>
-      {uploadedFiles.map((file) => (
-        <div>{file.name}</div>
-      ))}
-    </div>
-    <div>{message}</div>
-  </div>
-);
+  return (
+    <main className='h-screen flex flex-col p-5 justify-center items-center'>
+      <button className='absolute top-2 left-2 btn btn-outline-primary' onClick={() => navigate('/')}>Home</button>
+      <form onSubmit={upload} className='d-flex flex-column gap-3'>
+        <h1>Upload PDFs</h1>
+        <p>Choose up to five PDFs. The API enforces authentication, size limits, and PDF signatures.</p>
+        <input type='file' multiple accept='application/pdf' onChange={handleFiles} />
+        <ul>{files.map((file) => <li key={`${file.name}-${file.size}`}>{file.name}</li>)}</ul>
+        <button type='submit' className='btn btn-primary' disabled={submitting || !files.length}>
+          {submitting ? 'Uploading…' : 'Upload securely'}
+        </button>
+        <p role='status'>{message}</p>
+      </form>
+    </main>
+  );
 }
 
 export default Upload;

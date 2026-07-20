@@ -10,8 +10,6 @@ import Signup from './Signup';
 import ProtectedRoute from './components/ProtectedRoute.js'
 import Profile from './components/Profile'
 import Upload from './components/Upload'
-import axios from 'axios';
-import Userside from './components/Userside';
 
 const router = createBrowserRouter([
   {
@@ -27,16 +25,12 @@ const router = createBrowserRouter([
     element: <Signup />,
   },
   {
-    path: "/profile/:id",
+    path: "/profile",
     element: <ProtectedRoute Component={Profile} />,
   },
   {
-    path: "/upload/",
-    element: <Userside />,
-  },
-  {
-    path: "/upload/:id",
-    element: <Upload />,
+    path: "/upload",
+    element: <ProtectedRoute Component={Upload} />,
   },
 ]);
 

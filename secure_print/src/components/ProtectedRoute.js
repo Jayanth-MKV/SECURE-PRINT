@@ -1,12 +1,8 @@
-import React from "react";
-import Login from "../Login";
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { getSession } from '../utils';
 
-const ProtectedRoute = ({ Component, ...props }) => {
-  const isAuthenticated = localStorage.getItem("token") !== null;
-
-  return (
-    isAuthenticated ? <Component {...props} /> : <Login />
-  );
-};
+const ProtectedRoute = ({ Component, ...props }) =>
+  getSession() ? <Component {...props} /> : <Navigate to='/login' replace />;
 
 export default ProtectedRoute;

@@ -1,19 +1,17 @@
 {
-  "name": "hackinno",
+  "name": "secure-print-desktop",
   "version": "1.0.0",
-  "description": "",
+  "description": "Isolated desktop print client for the Secure Print research prototype",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electronmon ."
+    "start": "electron .",
+    "dev": "electronmon ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "crypto": "^1.0.1",
     "electron": "^26.2.0",
-    "electronmon": "^2.0.2",
-    "fs-extra": "^11.1.1"
+    "electronmon": "^2.0.2"
   }
 }

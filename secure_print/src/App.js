@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 function App() {
 
   useEffect(() => {
-     const token = localStorage.getItem("token");
+     const token = sessionStorage.getItem("token");
      if (token) {
        setAuthToken(token);
      }
@@ -20,12 +20,12 @@ function App() {
     <div className='App bg-[#111827] text-slate-200 flex flex-col gap-10'>
       <div className='flex flex-col-reverse md:flex-row'>
         <div className='md:w-1/2 flex flex-col items-left text-left justify-center p-10 gap-10'>
-          <h1 className='text-4xl font-bold text-slate-100'>
-            <h2 className='text-6xl text-[#3362CC] font-extrabold'>
+          <div className='text-4xl font-bold text-slate-100'>
+            <h1 className='text-6xl text-[#3362CC] font-extrabold'>
               Secure Print
-            </h2>{" "}
+            </h1>{" "}
             Enhancing Print Security
-          </h1>
+          </div>
           <h3 className='text-xl font-mono font-semibold text-slate-400'>
             Introducing{" "}
             <span className='text-blue-200 text-2xl'> Secure Print</span> a
@@ -42,7 +42,7 @@ function App() {
           </div>
         </div>
         <div className='md:w-1/2'>
-          <img src={logo} alt='Secure Print' srcset='' />
+          <img src={logo} alt='Secure Print' />
         </div>
       </div>
       <div id='howtouse' className='md:mt-5 flex flex-col gap-5 items-center'>

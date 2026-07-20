@@ -1,166 +1,121 @@
-const { app, BrowserWindow,ipcMain,dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, net, session } = require('electron');
+const fs = require('fs/promises');
+const path = require('path');
+const crypto = require('crypto');
+const { pathToFileURL } = require('url');
 
-let win;
-function createWindow() {
-  // Create the browser window.
-  win = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-      enableRemoteModule: true,
-    },
-  });
-
-  // Load the index.html of the app.
-  win.loadFile("login.html");
-
-  // Open the DevTools.
-  win.webContents.openDevTools();
+const configuredApi = process.env.SECURE_PRINT_API_URL || 'http://127.0.0.1:5000/api';
+const apiUrl = new URL(configuredApi);
+if (apiUrl.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(apiUrl.hostname)) {
+  throw new Error('SECURE_PRINT_API_URL must use loopback HTTP for this local prototype');
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-// This method is equivalent to 'app.on('ready', function())'
-app.whenReady().then(createWindow);
+let mainWindow;
+let accessToken;
 
+function secureWindowOptions(extra = {}) {
+  return {
+    ...extra,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      devTools: process.env.NODE_ENV !== 'production',
+    },
+  };
+}
 
-// Quit when all windows are closed.
-app.on("window-all-closed", () => {
-  // On macOS it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
-let selection;
-
-app.on("ready", () => {
-  const { dialog } = require("electron");
-  // dialog.showMessageBox(null);
-  const printerSelection = dialog.showMessageBox({
-      type: "info",
-      buttons: ['OneNote for Windows 10', 'OneNote (Desktop)', 'My-Printer-1', 'Microsoft XPS Document Writer', 'Microsoft Print to PDF'],
-      title: "Select Printer",
-      message: "Choose a printer for the PDF:",
+function protectWindow(window) {
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, target) => {
+    if (!target.startsWith('file:')) event.preventDefault();
   });
-  selection=printerSelection.response
-});
+}
 
-app.on("activate", () => {
-  // On macOS it's common to re-create a window in the
-  // app when the dock icon is clicked and there are no
-  // other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+function createWindow() {
+  mainWindow = new BrowserWindow(secureWindowOptions({ width: 900, height: 700 }));
+  protectWindow(mainWindow);
+  void mainWindow.loadFile('login.html');
+}
+
+async function apiRequest(relativePath, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const response = await net.fetch(new URL(relativePath, `${apiUrl.toString().replace(/\/$/, '')}/`), {
+    ...options,
+    headers,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || 'API request failed');
   }
+  return response;
+}
+
+ipcMain.handle('auth:login', async (_event, credentials) => {
+  const phoneNumber = String(credentials?.phoneNumber || '').trim();
+  const password = String(credentials?.password || '');
+  if (!phoneNumber || !password || password.length > 128) throw new Error('Invalid credentials');
+  const response = await apiRequest('auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phoneNumber, password }),
+  });
+  const body = await response.json();
+  accessToken = body.token;
+  await mainWindow.loadFile('index.html');
+  return true;
 });
 
-// Function to get a list of available printers
-ipcMain.on("getPrinters", (event) => {
-  const printers = win.webContents.getPrinters();
-  console.log(printers)
-  event.returnValue = printers.map((printer) => printer.name);
+ipcMain.handle('documents:list', async () => {
+  if (!accessToken) throw new Error('Sign in required');
+  const response = await apiRequest('documents');
+  const body = await response.json();
+  return body.documents;
 });
 
-ipcMain.on("getSelection", (e) => {
-    const { dialog } = require("electron");
-const printers = win.webContents.getPrinters();
-    const printerSelection = dialog.showMessageBox({
-      type: "info",
-      buttons: printers,
-      title: "Select Printer",
-      message: "Choose a printer for the PDF:",
+ipcMain.handle('printers:list', async () => {
+  if (!accessToken) throw new Error('Sign in required');
+  const printers = await mainWindow.webContents.getPrintersAsync();
+  return printers.map(({ name, displayName, isDefault }) => ({ name, displayName, isDefault }));
+});
+
+ipcMain.handle('documents:print', async (_event, { documentId, printerName }) => {
+  if (!accessToken) throw new Error('Sign in required');
+  if (!/^[a-f\d]{24}$/i.test(String(documentId))) throw new Error('Invalid document');
+  const printers = await mainWindow.webContents.getPrintersAsync();
+  if (!printers.some((printer) => printer.name === printerName)) throw new Error('Select an available printer');
+
+  const response = await apiRequest(`documents/${documentId}/content`);
+  const tempPath = path.join(app.getPath('temp'), `secure-print-${crypto.randomUUID()}.pdf`);
+  await fs.writeFile(tempPath, Buffer.from(await response.arrayBuffer()), { mode: 0o600 });
+  const printWindow = new BrowserWindow(secureWindowOptions({ show: false }));
+  protectWindow(printWindow);
+
+  try {
+    await printWindow.loadURL(pathToFileURL(tempPath).toString());
+    await new Promise((resolve, reject) => {
+      printWindow.webContents.print(
+        { silent: true, printBackground: true, deviceName: printerName },
+        (success) => (success ? resolve() : reject(new Error('Printer rejected the job'))),
+      );
     });
-
-    if (printerSelection.response !== 0) {
-      // User canceled the printer selection
-      return;
+    await apiRequest(`documents/${documentId}`, { method: 'DELETE' });
+    return { printed: true, deleted: true };
+  } finally {
+    printWindow.destroy();
+    await fs.rm(tempPath, { force: true });
   }
-  e.returnValue = printerSelection.response || selection;
-})
-
-
-
-ipcMain.on("sendprintjob", (event) => {
-  console.log("In sendprint")
-  win.webContents.print({silent:true}, (success, errorType) => {
-    if (!success) {
-      console.error(`Error printing PDF: `);
-    }
-  })
-
-
-  
-
 });
-// ipcMain.on("printPDF", (event, pdfUrl, printerName) => {
-//   try {
-//     const options = {
-//       silent: true,
-//       printBackground: true,
-//       deviceName: printerName,
-//     };
 
-//     mainWindow.webContents.print(options, (success, errorType) => {
-//       if (!success) {
-//         console.error(`Error printing PDF: ${errorType}`);
-//       }
-//     });
-//   } catch (error) {
-//     console.error("Error printing PDF:", error);
-//   }
-// });
-
-// const electron = require("electron");
-
-// const { app, BrowserWindow, ipcMain } = electron;
-
-// let mainWindow;
-
-// function createWindow() {
-//     mainWindow = new BrowserWindow({
-//       width: 800,
-//       height: 600,
-//       webPreferences: {
-//         nodeIntegration: true,
-//         contextIsolation: false,
-//         enableRemoteModule: true,
-//       },
-//     });
-//   mainWindow.loadFile("index.html");
-// }
-
-// app.whenReady().then(createWindow);
-
-// ipcMain.on("print-pdf", (event) => {
-//     if (mainWindow) {
-
-//         printWindow = new BrowserWindow({ show: false });
-
-//         printWindow.loadURL(
-//           "https://jntugvcev.edu.in/wp-content/uploads/2021/10/R20-CSE-with-HONORS-AND-MINORS-FINAL-22-10-2021-converted.pdf"
-//         );
-//          printWindow.webContents.on("did-finish-load", () => {
-//            printWindow.webContents.print({}, (success, errorType) => {
-//              if (!success) {
-//                console.error(`Error printing PDF: ${errorType}`);
-//              }
-
-//              // Delete the temporary PDF file
-//             //  fs.removeSync(tempFilePath);
-//            });
-//          });
-//     // mainWindow.webContents.print({}, (success, errorType) => {
-//     //   if (!success) {
-//     //     console.error(`Error printing PDF: ${errorType}`);
-//     //   } else {
-//     //     // Send a message to delete the temporary PDF after printing
-//     //     mainWindow.webContents.send("delete-temp-pdf");
-//     //   }
-//     // });
-//   }
-// });
+app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  createWindow();
+});
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});

@@ -1,37 +1,26 @@
-const express = require("express");
-const multer = require("multer");
-const path = require('path');
-const fs = require('fs-extra');
-const { uploadPDF, listPDFs, deletePDF } = require("../controller/Pdf.js");
+const express = require('express');
+const multer = require('multer');
+const requireAuth = require('../middleware/auth');
+const { uploadPDF, listPDFs, downloadPDF, deletePDF } = require('../controller/Pdf');
 
 const router = express.Router();
-const storage = multer.diskStorage({
-  destination: async(req, file, cb) => {
-    const {phoneNumber} = req.query;
-    console.log(req)
-    console.log(file)
-    await fs.ensureDir(`./${phoneNumber}`, (err) => {
-      if (err) return console.log(err);
-      console.log("Directory exists");
-    });
-    const uploadPath = path.join(__dirname, `../${phoneNumber}`);
-    // fs.mkdir(uploadPath, (err) => {
-      console.log(uploadPath)
-      console.log(phoneNumber)
-      cb(null, uploadPath);
-  // }
-    // )
+const asyncHandler = (handler) => (request, response, next) =>
+  Promise.resolve(handler(request, response, next)).catch(next);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 5,
+    fileSize: Number(process.env.MAX_PDF_BYTES || 10 * 1024 * 1024),
   },
-  filename: (req, file, cb) => {
-const now = new Date().toISOString();
-const date = now.replace(/:/g, "-");
-cb(null, date + file.originalname);  },
+  fileFilter: (_request, file, callback) => {
+    callback(null, file.mimetype === 'application/pdf');
+  },
 });
-const upload = multer({ storage });
 
-
-router.post("/upload", upload.array("file", 5), uploadPDF);
-router.get("/pdfs/:phoneNumber", listPDFs);
-router.delete("/pdfs/:phoneNumber/:filename", deletePDF);
+router.use(requireAuth);
+router.post('/', upload.array('file', 5), asyncHandler(uploadPDF));
+router.get('/', asyncHandler(listPDFs));
+router.get('/:documentId/content', asyncHandler(downloadPDF));
+router.delete('/:documentId', asyncHandler(deletePDF));
 
 module.exports = router;

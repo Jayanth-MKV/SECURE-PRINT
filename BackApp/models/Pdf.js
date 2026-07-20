@@ -1,10 +1,11 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const pdfSchema = new mongoose.Schema({
-  phoneNumber: { type: String, required: true },
-  filename: { type: String, required: true },
-});
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  originalName: { type: String, required: true, maxlength: 255 },
+  storageName: { type: String, required: true, unique: true, select: false },
+  size: { type: Number, required: true },
+  status: { type: String, enum: ['pending', 'printing'], default: 'pending' },
+}, { timestamps: true });
 
-const PDF = mongoose.model("PDF", pdfSchema);
-
-module.exports = PDF;
+module.exports = mongoose.model('PDF', pdfSchema);
